@@ -1,0 +1,37 @@
+name: Import public update payload
+on:
+  push:
+    paths:
+      - '.github/workflows/import-update.yml'
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch checked update payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --max-time 90 'https://sdmntpraustraliaeast.oaiusercontent.com/files/00000000-75fc-81fa-9e4d-50a35922dd7e/raw?se=2026-11-01T08%3A15%3A04Z&sp=r&sv=2026-02-06&sr=b&scid=05e6f6cb-e820-5653-aa06-02b4fd497242&skoid=cb94e22a-e3df-4e6a-9e17-1696f40fa435&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-31T23%3A03%3A13Z&ske=2026-11-01T23%3A03%3A13Z&sks=b&skv=2026-02-06&sig=hSjfdm5wHn2zoiPDY8rk6QVX1oH63lzRoQQMy3tPD68%3D' -o /tmp/payload.zip
+          unzip -o /tmp/payload.zip -d /tmp/payload
+          echo 'd5a7754ffbbd1cd47a7a7cbced8e9dca97f4e571cb6b0714fe67212e58167967  /tmp/payload/CatPet-Fold3-V090.apk' | sha256sum -c
+          cp /tmp/payload/CatPet-Fold3-V090.apk .
+          cp /tmp/payload/latest.json .
+          python3 - <<'PY'
+          import json,hashlib,os
+          p=json.load(open('latest.json'))
+          b=open('CatPet-Fold3-V090.apk','rb').read()
+          assert p['size']==len(b) and p['sha256']==hashlib.sha256(b).hexdigest()
+          assert p['versionCode']==10
+          PY
+      - name: Commit published APK and manifest
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest.json CatPet-Fold3-V090.apk
+          git commit -m "Publish signed V0.9 update package"
+          git push
