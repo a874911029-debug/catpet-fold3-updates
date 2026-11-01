@@ -1,0 +1,40 @@
+name: One-time verified V0.15 import
+on:
+  push:
+    paths:
+      - '.github/workflows/import-v0150.yml'
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve and validate V0.15 signed build
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --max-time 90 'https://sdmntpraustraliaeast.oaiusercontent.com/files/00000000-2080-81fa-b1c1-1a437f6f0109/raw?se=2026-11-01T10%3A25%3A13Z&sp=r&sv=2026-02-06&sr=b&scid=1ef92ff9-5f30-5f48-9f23-7738cf94f267&skoid=cb94e22a-e3df-4e6a-9e17-1696f40fa435&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-31T23%3A02%3A26Z&ske=2026-11-01T23%3A02%3A26Z&sks=b&skv=2026-02-06&sig=OqEMIRuUOKyjAt5hwbQfQEuz2wQRJ0cOnbGeF5zfbtY%3D' -o /tmp/catpet-v0150.zip
+          mkdir -p /tmp/catpet-v0150
+          unzip -o /tmp/catpet-v0150.zip -d /tmp/catpet-v0150
+          echo '1534f37129dd8202fcbc41b734404835ebb53534fd8c46c22db6d185a05c7810  /tmp/catpet-v0150/CatPet-Fold3-V0150.apk' | sha256sum -c
+          python3 - <<'PY'
+          import json,hashlib,os
+          m=json.load(open('/tmp/catpet-v0150/latest.json'))
+          f='/tmp/catpet-v0150/CatPet-Fold3-V0150.apk'
+          assert m['versionCode']==16 and m['versionName']=='0.15.0-test'
+          assert m['size']==os.path.getsize(f)
+          assert m['sha256']==hashlib.sha256(open(f,'rb').read()).hexdigest()
+          assert m['apkUrl']=='https://raw.githubusercontent.com/a874911029-debug/catpet-fold3-updates/main/CatPet-Fold3-V0150.apk'
+          PY
+          cp /tmp/catpet-v0150/CatPet-Fold3-V0150.apk .
+          cp /tmp/catpet-v0150/latest.json .
+      - name: Commit verified direct update
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CatPet-Fold3-V0150.apk latest.json
+          git commit -m "Publish signed CatPet V0.15"
+          git push
