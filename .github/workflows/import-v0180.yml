@@ -1,0 +1,44 @@
+name: Verified CatPet V0.18 publish
+on:
+  push:
+    paths:
+      - '.github/workflows/import-v0180.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify signed V0.18 direct update package
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --max-time 90 'https://sdmntpraustraliaeast.oaiusercontent.com/files/00000000-517c-81fa-8a56-6d177a03ac07/raw?se=2026-11-01T11%3A10%3A09Z&sp=r&sv=2026-02-06&sr=b&scid=2147c595-7c12-5565-ab1c-83bfc62ba865&skoid=cb94e22a-e3df-4e6a-9e17-1696f40fa435&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-01T01%3A24%3A34Z&ske=2026-11-02T01%3A24%3A34Z&sks=b&skv=2026-02-06&sig=xz8sh6TqGAt2ZiOZJm0KcfvuXdZgXQdlRInwzFYy7oE%3D' -o /tmp/catpet-v0180.zip
+          mkdir -p /tmp/catpet-v0180
+          unzip -o /tmp/catpet-v0180.zip -d /tmp/catpet-v0180
+          echo 'bce49d35aa693780d8b142683c913bec6f66893b57f64d4adc56598b8388aa8a  /tmp/catpet-v0180/CatPet-Fold3-V0180.apk' | sha256sum -c
+          python3 - <<'PY'
+          import hashlib,json,os,zipfile
+          p='/tmp/catpet-v0180/CatPet-Fold3-V0180.apk'
+          m=json.load(open('/tmp/catpet-v0180/latest.json'))
+          assert m['versionCode']==20 and m['versionName']=='0.18.0-test'
+          assert m['size']==os.path.getsize(p)
+          assert m['sha256']==hashlib.sha256(open(p,'rb').read()).hexdigest()
+          assert m['apkUrl']=='https://raw.githubusercontent.com/a874911029-debug/catpet-fold3-updates/main/CatPet-Fold3-V0180.apk'
+          with zipfile.ZipFile(p) as z:
+              art=z.read('assets/cat07_default.webp')
+          assert hashlib.sha256(art).hexdigest()=='ffb2c984e9064b1684bc412b6ae26e6f88aa79821718af067743c5ca818317a9'
+          PY
+          cp /tmp/catpet-v0180/CatPet-Fold3-V0180.apk .
+          cp /tmp/catpet-v0180/latest.json .
+      - name: Publish update feed and APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CatPet-Fold3-V0180.apk latest.json
+          git commit -m "Publish signed CatPet V0.18 two-dimensional roaming"
+          git push
