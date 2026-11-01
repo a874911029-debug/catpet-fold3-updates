@@ -1,0 +1,41 @@
+name: One-time verified V0.14 import
+on:
+  push:
+    paths:
+      - '.github/workflows/import-v0140.yml'
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download, verify and publish signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --max-time 90 'https://sdmntpraustraliaeast.oaiusercontent.com/files/00000000-c518-81fa-b11e-7773d85c274e/raw?se=2026-11-01T10%3A04%3A32Z&sp=r&sv=2026-02-06&sr=b&scid=4f09419a-ac77-588c-8b70-93246d67705b&skoid=cb94e22a-e3df-4e6a-9e17-1696f40fa435&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-01T05%3A37%3A25Z&ske=2026-11-02T05%3A37%3A25Z&sks=b&skv=2026-02-06&sig=yzqXgAnLnHkplNIH4cwlb0ZdliXfHoWUhnnkrwCIbmw%3D' -o /tmp/package.zip
+          mkdir -p /tmp/catpet_v0140
+          unzip -o /tmp/package.zip -d /tmp/catpet_v0140
+          echo 'b9c1038aad9b3dab02083c1a6589ba4572662f50df8b09138f5ad7fa8c5dfdc6  /tmp/catpet_v0140/CatPet-Fold3-V0140.apk' | sha256sum -c
+          python3 - <<'PY'
+          import hashlib,json,os
+          path='/tmp/catpet_v0140/CatPet-Fold3-V0140.apk'
+          p=json.load(open('/tmp/catpet_v0140/latest.json'))
+          assert p['versionCode']==15 and p['versionName']=='0.14.0-test'
+          assert p['sha256']==hashlib.sha256(open(path,'rb').read()).hexdigest()
+          assert p['size']==os.path.getsize(path)
+          assert p['apkUrl']=='https://raw.githubusercontent.com/a874911029-debug/catpet-fold3-updates/main/CatPet-Fold3-V0140.apk'
+          PY
+          cp /tmp/catpet_v0140/CatPet-Fold3-V0140.apk .
+          cp /tmp/catpet_v0140/latest.json .
+      - name: Commit verified release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CatPet-Fold3-V0140.apk latest.json
+          git commit -m "Publish signed CatPet V0.14 sprite pack player"
+          git push
